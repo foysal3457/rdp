@@ -11,34 +11,28 @@ jobs:
     steps:
       - name: Configure Core RDP Settings
         run: |
+          # আরডিপি এনাবল করা
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "SecurityLayer" -Value 0 -Force
-
+          
+          # ফায়ারওয়াল সেটআপ
           netsh advfirewall firewall delete rule name="RDP-Tailscale"
           netsh advfirewall firewall add rule name="RDP-Tailscale" dir=in action=allow protocol=TCP localport=3389
           Restart-Service -Name TermService -Force
 
-      - name: Create RDP User with Password 2007
+      - name: Create RDP User with Fixed Password
         run: |
-          # পাসওয়ার্ড সরাসরি 2007 সেট করা হলো
-          $Password = "2007"
-          $SecurePassword = ConvertTo-SecureString $Password -AsPlainText -Force
+          # যদি 'RDP' নামে ইউজার থাকে তবে তা মুছে ফেলা
+          net user RDP /delete /yes 2>$null
           
-          # যদি ইউজার আগে থেকে থাকে তবে সেটি ডিলিট করবে
-          if (Get-LocalUser -Name "RDP" -ErrorAction SilentlyContinue) {
-              Remove-LocalUser -Name "RDP"
-          }
+          # নতুন ইউজার তৈরি এবং আপনার দেওয়া পাসওয়ার্ড সেট করা
+          net user RDP "Foysal@2007" /add /expires:never
           
-          # নতুন ইউজার তৈরি
-          New-LocalUser -Name "RDP" -Password $SecurePassword -FullName "RDP User" -Description "RDP User with fixed password" -AccountNeverExpires
+          # ইউজারকে অ্যাডমিন এবং আরডিপি গ্রুপে যোগ করা
+          net localgroup Administrators RDP /add
+          net localgroup "Remote Desktop Users" RDP /add
           
-          # অ্যাডমিন পারমিশন দেওয়া
-          Add-LocalGroupMember -Group "Administrators" -Member "RDP"
-          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP"
-          
-          # পাসওয়ার্ডটি এনভায়রনমেন্টে সেভ করা
-          echo "RDP_PASS=2007" >> $env:GITHUB_ENV
+          Write-Host "User 'RDP' created with password: Foysal@2007"
 
       - name: Install Tailscale
         run: |
@@ -61,15 +55,15 @@ jobs:
           }
           echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
       
-      - name: Maintain Connection
+      - name: RDP Connection Details
         run: |
-          Write-Host "`n=============================="
-          Write-Host "RDP ADDRESS: $env:TAILSCALE_IP"
-          Write-Host "USERNAME: RDP"
-          Write-Host "PASSWORD: 2007"
-          Write-Host "==============================`n"
+          Write-Host "`n=========================================="
+          Write-Host "RDP Address: $env:TAILSCALE_IP"
+          Write-Host "Username: RDP"
+          Write-Host "Password: Foysal@2007"
+          Write-Host "==========================================`n"
           
+          # রানার সেশন চালু রাখা
           while ($true) {
-              Write-Host "[$(Get-Date)] RDP Active..."
               Start-Sleep -Seconds 300
           }
